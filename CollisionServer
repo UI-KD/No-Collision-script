@@ -1,0 +1,84 @@
+local PhysicsService = game:GetService("PhysicsService")
+local Players = game:GetService("Players")
+ 
+local playerCollisionGroupName = "Players"
+PhysicsService:CreateCollisionGroup(playerCollisionGroupName)
+PhysicsService:CollisionGroupSetCollidable(playerCollisionGroupName, playerCollisionGroupName, false)
+
+local playerCollisionOn = true
+
+local previousCollisionGroups = {}
+local previousObjects = {}
+ 
+local function setCollisionGroup(object)
+  if object:IsA("BasePart") then
+		previousCollisionGroups[object] = object.CollisionGroupId
+		table.insert(previousObjects,object)--MOVE IT HERE
+		
+		if playerCollisionOn == true then			
+			PhysicsService:SetPartCollisionGroup(object, playerCollisionGroupName)
+			--table.insert(previousObjects,object)
+		end	
+  end
+end
+
+local function toggleCollide()
+	if playerCollisionOn == true then
+		print("Toggling collsion off")
+		
+		for i, object in pairs(previousObjects) do			
+			PhysicsService:RemoveCollisionGroup(object, playerCollisionGroupName)
+		end
+		
+		PhysicsService:CollisionGroupSetCollidable(playerCollisionGroupName, playerCollisionGroupName, false)
+		playerCollisionOn = false
+	else
+		print("Toggling collsion on")
+		
+		for i, object in pairs(previousObjects) do
+			previousCollisionGroups[object] = object.CollisionGroupId
+			PhysicsService:SetPartCollisionGroup(object, playerCollisionGroupName)
+		end
+		
+		PhysicsService:CollisionGroupSetCollidable(playerCollisionGroupName, playerCollisionGroupName, true)
+		playerCollisionOn = true
+	end
+end	
+ 
+local function setCollisionGroupRecursive(object)
+  setCollisionGroup(object)
+ 
+  for _, child in ipairs(object:GetChildren()) do
+    setCollisionGroupRecursive(child)
+  end
+end
+ 
+local function resetCollisionGroup(object)
+  local previousCollisionGroupId = previousCollisionGroups[object]
+  if not previousCollisionGroupId then return end 
+ 
+  local previousCollisionGroupName = PhysicsService:GetCollisionGroupName(previousCollisionGroupId)
+  if not previousCollisionGroupName then return end
+ 
+  PhysicsService:SetPartCollisionGroup(object, previousCollisionGroupName)
+  previousCollisionGroups[object] = nil
+end
+ 
+local function onCharacterAdded(character)
+  setCollisionGroupRecursive(character)
+ 
+  character.DescendantAdded:Connect(setCollisionGroup)
+  character.DescendantRemoving:Connect(resetCollisionGroup)
+end
+ 
+local function onPlayerAdded(player)
+  player.CharacterAdded:Connect(onCharacterAdded)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+
+local SwordRemotesFolder = game:GetService("ReplicatedStorage"):FindFirstChild("SwordRailRemotes")
+local ToggleCollideRemote = SwordRemotesFolder:FindFirstChild("ToggleCollide")
+ToggleCollideRemote.OnServerEvent:Connect(toggleCollide)
+
+
